@@ -116,7 +116,7 @@ spec:
         node-role.kubernetes.io/master: ""
       containers:
       - name: kubernetes-dashboard
-        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.8.3
+        image: registry.cn-beijing.aliyuncs.com/k8s_len/kubernetes-dashboard-amd64:v1.8.3
         ports:
         - containerPort: 8443
           protocol: TCP

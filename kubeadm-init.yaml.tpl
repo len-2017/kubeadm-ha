@@ -1,6 +1,6 @@
 apiVersion: kubeadm.k8s.io/v1alpha1
 kind: MasterConfiguration
-kubernetesVersion: v1.9.1
+kubernetesVersion: v1.9.3
 networking:
   podSubnet: K8SHA_CIDR
 apiServerCertSANs:
@@ -18,4 +18,5 @@ etcd:
   - http://K8SHA_IP2:2379
   - http://K8SHA_IP3:2379
 token: K8SHA_TOKEN
+imageRepository: KUBE_REPO_PREFIX
 tokenTTL: "0"

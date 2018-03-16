@@ -22,7 +22,7 @@ spec:
         node-role.kubernetes.io/master: ""
       containers:
       - name: heapster
-        image: gcr.io/google_containers/heapster-amd64:v1.4.2
+        image: registry.cn-beijing.aliyuncs.com/k8s_len/heapster-amd64:v1.4.2
         imagePullPolicy: IfNotPresent
         command:
         - /heapster

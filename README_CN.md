@@ -48,7 +48,6 @@
 1. [node节点加入高可用集群设置](#node节点加入高可用集群设置)
     1. [kubeadm加入高可用集群](#kubeadm加入高可用集群)
     1. [验证集群高可用设置](#验证集群高可用设置)
-    
 
 
 ### 部署架构
@@ -94,9 +93,9 @@
 
 主机名 | IP地址 | 说明 | 组件 
 :--- | :--- | :--- | :---
-devops-master01 ~ 03 | 192.168.20.27 ~ 29 | master节点 * 3 | keepalived、nginx、etcd、kubelet、kube-apiserver、kube-scheduler、kube-proxy、kube-dashboard、heapster、calico
-无 | 192.168.20.10 | keepalived虚拟IP | 无
-devops-node01 ~ 04 | 192.168.20.17 ~ 20 | node节点 * 4 | kubelet、kube-proxy
+devops-master01 ~ 03 | 192.168.66.100 ~ 102 | master节点 * 3 | keepalived、nginx、etcd、kubelet、kube-apiserver、kube-scheduler、kube-proxy、kube-dashboard、heapster、calico
+无 | 192.168.66.10 | keepalived虚拟IP | 无
+devops-node01 ~ 02 | 192.168.66.103 ~ 104 | node节点 * 2 | kubelet、kube-proxy
 
 ---
 
@@ -203,6 +202,16 @@ docker pull nginx:latest
 
 #### 系统设置
 
+主机名称设置
+
+```
+hostnamectl --static set-hostname master01
+hostnamectl --static set-hostname master02
+hostnamectl --static set-hostname master03
+hostnamectl --static set-hostname node01
+hostnamectl --static set-hostname node02
+```
+
 * 在所有kubernetes节点上增加kubernetes仓库 
 
 ```
@@ -219,23 +228,23 @@ EOF
 
 * 在所有kubernetes节点上进行系统更新
 
-```
+```shell
 $ yum update -y
 ```
 
 * 在所有kubernetes节点上设置SELINUX为permissive模式
 
-```
-$ vi /etc/selinux/config
-SELINUX=permissive
-
-$ setenforce 0
+```shell
+# 禁用SELinux, 目的是让容器可以读取主机的文件系统.
+setenforce 0
+sed -i "s/^SELINUX=enforcing/SELINUX=permissive/g" /etc/sysconfig/selinux 
+sed -i "s/^SELINUX=enforcing/SELINUX=permissive/g" /etc/selinux/config 
 ```
 
 * 在所有kubernetes节点上设置iptables参数，否则kubeadm init会提示错误
 
-```
-$ cat <<EOF >  /etc/sysctl.d/k8s.conf
+```shell
+cat <<EOF >  /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
@@ -246,22 +255,21 @@ sysctl --system
 
 * 在所有kubernetes节点上禁用swap
 
-```
-$ swapoff -a
-
-# 禁用fstab中的swap项目
-$ vi /etc/fstab
-#/dev/mapper/centos-swap swap                    swap    defaults        0 0
+```shell
+#关闭swap(貌似只有1.8以上需要操作,待确认)
+swapoff -a
+#再把/etc/fstab文件中带有swap的行删了,没有就无视
+sed -i '/swap/'d /etc/fstab
 
 # 确认swap已经被禁用
-$ cat /proc/swaps
+cat /proc/swaps
 Filename                Type        Size    Used    Priority
 ```
 
 * 在所有kubernetes节点上重启主机
 
 ```
-$ reboot
+reboot
 ```
 
 ---
@@ -277,7 +285,7 @@ $ reboot
 协议 | 方向 | 端口 | 说明
 :--- | :--- | :--- | :---
 TCP | Inbound | 16443*    | Load balancer Kubernetes API server port
-TCP | Inbound | 6443*     | Kubernetes API server
+TCP | Inbound | 6443     | Kubernetes API server
 TCP | Inbound | 4001      | etcd listen client port
 TCP | Inbound | 2379-2380 | etcd server client API
 TCP | Inbound | 10250     | Kubelet API
@@ -288,22 +296,26 @@ TCP | Inbound | 30000-32767 | NodePort Services
 
 - 在所有master节点上开放相关firewalld端口（因为以上服务基于docker部署，如果docker版本为17.x，可以不进行以下设置，因为docker会自动修改iptables添加相关端口）
 
+```shell
+systemctl status firewalld
+
+firewall-cmd --zone=public --add-port=16443/tcp --permanent
+firewall-cmd --zone=public --add-port=6443/tcp --permanent
+firewall-cmd --zone=public --add-port=4001/tcp --permanent
+firewall-cmd --zone=public --add-port=2379-2380/tcp --permanent
+firewall-cmd --zone=public --add-port=10250/tcp --permanent
+firewall-cmd --zone=public --add-port=10251/tcp --permanent
+firewall-cmd --zone=public --add-port=10252/tcp --permanent
+firewall-cmd --zone=public --add-port=10255/tcp --permanent
+firewall-cmd --zone=public --add-port=30000-32767/tcp --permanent
+
+firewall-cmd --reload
+
+firewall-cmd --list-all --zone=public
+
 ```
-$ systemctl status firewalld
 
-$ firewall-cmd --zone=public --add-port=16443/tcp --permanent
-$ firewall-cmd --zone=public --add-port=6443/tcp --permanent
-$ firewall-cmd --zone=public --add-port=4001/tcp --permanent
-$ firewall-cmd --zone=public --add-port=2379-2380/tcp --permanent
-$ firewall-cmd --zone=public --add-port=10250/tcp --permanent
-$ firewall-cmd --zone=public --add-port=10251/tcp --permanent
-$ firewall-cmd --zone=public --add-port=10252/tcp --permanent
-$ firewall-cmd --zone=public --add-port=10255/tcp --permanent
-$ firewall-cmd --zone=public --add-port=30000-32767/tcp --permanent
-
-$ firewall-cmd --reload
-
-$ firewall-cmd --list-all --zone=public
+```properties
 public (active)
   target: default
   icmp-block-inversion: no
@@ -319,6 +331,8 @@ public (active)
   rich rules: 
 ```
 
+
+
 - 相关端口（worker）
 
 协议 | 方向 | 端口 | 说明
@@ -330,15 +344,18 @@ TCP | Inbound | 30000-32767 | NodePort Services
 - 在所有worker节点上开放相关firewalld端口（因为以上服务基于docker部署，如果docker版本为17.x，可以不进行以下设置，因为docker会自动修改iptables添加相关端口）
 
 ```
-$ systemctl status firewalld
+systemctl status firewalld
 
-$ firewall-cmd --zone=public --add-port=10250/tcp --permanent
-$ firewall-cmd --zone=public --add-port=10255/tcp --permanent
-$ firewall-cmd --zone=public --add-port=30000-32767/tcp --permanent
+firewall-cmd --zone=public --add-port=10250/tcp --permanent
+firewall-cmd --zone=public --add-port=10255/tcp --permanent
+firewall-cmd --zone=public --add-port=30000-32767/tcp --permanent
 
-$ firewall-cmd --reload
+firewall-cmd --reload
 
-$ firewall-cmd --list-all --zone=public
+firewall-cmd --list-all --zone=public
+```
+
+```properties
 public (active)
   target: default
   icmp-block-inversion: no
@@ -354,16 +371,20 @@ public (active)
   rich rules: 
 ```
 
+
+
 * 在所有kubernetes节点上允许kube-proxy的forward
 
-```
-$ firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT 1 -i docker0 -j ACCEPT -m comment --comment "kube-proxy redirects"
-$ firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 1 -o docker0 -j ACCEPT -m comment --comment "docker subnet"
-$ firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 1 -i flannel.1 -j ACCEPT -m comment --comment "flannel subnet"
-$ firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 1 -o flannel.1 -j ACCEPT -m comment --comment "flannel subnet"
-$ firewall-cmd --reload
+```shell
+firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT 1 -i docker0 -j ACCEPT -m comment --comment "kube-proxy redirects"
+firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 1 -o docker0 -j ACCEPT -m comment --comment "docker subnet"
+firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 1 -i flannel.1 -j ACCEPT -m comment --comment "flannel subnet"
+firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 1 -o flannel.1 -j ACCEPT -m comment --comment "flannel subnet"
+firewall-cmd --reload
 
-$ firewall-cmd --direct --get-all-rules
+
+firewall-cmd --direct --get-all-rules
+
 ipv4 filter INPUT 1 -i docker0 -j ACCEPT -m comment --comment 'kube-proxy redirects'
 ipv4 filter FORWARD 1 -o docker0 -j ACCEPT -m comment --comment 'docker subnet'
 ipv4 filter FORWARD 1 -i flannel.1 -j ACCEPT -m comment --comment 'flannel subnet'
@@ -372,7 +393,7 @@ ipv4 filter FORWARD 1 -o flannel.1 -j ACCEPT -m comment --comment 'flannel subne
 
 - 在所有kubernetes节点上，删除iptables的设置，解决kube-proxy无法启用nodePort。（注意：每次重启firewalld必须执行以下命令）
 
-```
+```shell
 iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited
 ```
 
@@ -391,32 +412,45 @@ Permissive
 
 * 在所有kubernetes节点上安装并启动kubernetes 
 
-```
-$ yum install -y docker-ce-17.12.0.ce-0.2.rc2.el7.centos.x86_64
-$ yum install -y docker-compose-1.9.0-5.el7.noarch
-$ systemctl enable docker && systemctl start docker
+```shell
+ yum -y install docker-ce-17.12.1.ce-1.el7.centos
+curl -L https://github.com/docker/compose/releases/download/1.17.1/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+docker-compose --version
 
-$ yum install -y kubelet-1.9.3-0.x86_64 kubeadm-1.9.3-0.x86_64 kubectl-1.9.3-0.x86_64
-$ systemctl enable kubelet && systemctl start kubelet
+systemctl enable docker && systemctl start docker && systemctl status docker
+
+cd kubeadm-rpm && rpm -ivh *.rpm
+systemctl enable kubelet && systemctl start kubelet
+
+# 配置kubectl
+#kubelet 修改 配置以使用本地自定义pause镜像
+export KUBE_REPO_PREFIX=registry.cn-beijing.aliyuncs.com/k8s_len
+export KUBE_PAUSE_IMAGE=${KUBE_REPO_PREFIX}/pause-amd64:3.0
+cat > /etc/systemd/system/kubelet.service.d/20-pod-infra-image.conf <<EOF
+[Service]
+Environment="KUBELET_EXTRA_ARGS=--pod-infra-container-image=${KUBE_PAUSE_IMAGE}"
+EOF
+systemctl daemon-reload && systemctl enable kubelet && systemctl restart kubelet && systemctl status kubelet
 ```
 
 * 在所有kubernetes节点上设置kubelet使用cgroupfs，与dockerd保持一致，否则kubelet会启动报错
 
-```
+```shell
 # 默认kubelet使用的cgroup-driver=systemd，改为cgroup-driver=cgroupfs
-$ vi /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+# vi /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 #Environment="KUBELET_CGROUP_ARGS=--cgroup-driver=systemd"
-Environment="KUBELET_CGROUP_ARGS=--cgroup-driver=cgroupfs"
-
+#Environment="KUBELET_CGROUP_ARGS=--cgroup-driver=cgroupfs"
+sed  -i 's/--cgroup-driver=systemd/--cgroup-driver=cgroupfs/' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 # 重设kubelet服务，并重启kubelet服务
 $ systemctl daemon-reload && systemctl restart kubelet
 ```
 
 * 在所有master节点上安装并启动keepalived
 
-```
-$ yum install -y keepalived
-$ systemctl enable keepalived && systemctl restart keepalived
+```shell
+yum install -y keepalived
+systemctl enable keepalived && systemctl restart keepalived
 ```
 
 ---
@@ -429,19 +463,20 @@ $ systemctl enable keepalived && systemctl restart keepalived
 
 * 在所有master节点上获取代码，并进入代码目录
 
-```
-$ git clone https://github.com/cookeem/kubeadm-ha
-
-$ cd kubeadm-ha
+```shell
+git clone https://github.com/cookeem/kubeadm-ha
+cd kubeadm-ha
 ```
 
 * 在所有master节点上设置初始化脚本配置，每一项配置参见脚本中的配置说明，请务必正确配置。该脚本用于生成相关重要的配置文件
 
-```
+```shell
 $ vi create-config.sh
 
+#!/bin/bash
+
 # local machine ip address
-export K8SHA_IPLOCAL=192.168.20.27
+export K8SHA_IPLOCAL=192.168.66.100
 
 # local machine etcd name, options: etcd1, etcd2, etcd3
 export K8SHA_ETCDNAME=etcd1
@@ -453,32 +488,32 @@ export K8SHA_KA_STATE=MASTER
 export K8SHA_KA_PRIO=102
 
 # local machine keepalived network interface name config, for example: eth0
-export K8SHA_KA_INTF=nm-bond
+export K8SHA_KA_INTF=ens34
 
 #######################################
 # all masters settings below must be same
 #######################################
 
 # master keepalived virtual ip address
-export K8SHA_IPVIRTUAL=192.168.20.10
+export K8SHA_IPVIRTUAL=192.168.66.10
 
 # master01 ip address
-export K8SHA_IP1=192.168.20.27
+export K8SHA_IP1=192.168.66.100
 
 # master02 ip address
-export K8SHA_IP2=192.168.20.28
+export K8SHA_IP2=192.168.66.101
 
 # master03 ip address
-export K8SHA_IP3=192.168.20.29
+export K8SHA_IP3=192.168.66.102
 
 # master01 hostname
-export K8SHA_HOSTNAME1=devops-master01
+export K8SHA_HOSTNAME1=master01
 
 # master02 hostname
-export K8SHA_HOSTNAME2=devops-master02
+export K8SHA_HOSTNAME2=master02
 
 # master03 hostname
-export K8SHA_HOSTNAME3=devops-master03
+export K8SHA_HOSTNAME3=master03
 
 # keepalived auth_pass config, all masters must be same
 export K8SHA_KA_AUTH=4cdf7dc3b4c90194d1600c483e10ad1d
@@ -493,7 +528,73 @@ export K8SHA_CIDR=10.244.0.0\\/16
 export K8SHA_SVC_CIDR=10.96.0.0\\/12
 
 # calico network settings, set a reachable ip address for the cluster network interface, for example you can use the gateway ip address
-export K8SHA_CALICO_REACHABLE_IP=192.168.20.1
+export K8SHA_CALICO_REACHABLE_IP=192.168.66.1
+
+##############################
+# please do not modify anything below
+##############################
+
+# set etcd cluster docker-compose.yaml file
+sed \
+-e "s/K8SHA_ETCDNAME/$K8SHA_ETCDNAME/g" \
+-e "s/K8SHA_IPLOCAL/$K8SHA_IPLOCAL/g" \
+-e "s/K8SHA_IP1/$K8SHA_IP1/g" \
+-e "s/K8SHA_IP2/$K8SHA_IP2/g" \
+-e "s/K8SHA_IP3/$K8SHA_IP3/g" \
+etcd/docker-compose.yaml.tpl > etcd/docker-compose.yaml
+
+echo 'set etcd cluster docker-compose.yaml file success: etcd/docker-compose.yaml'
+
+# set keepalived config file
+mv /etc/keepalived/keepalived.conf /etc/keepalived/keepalived.conf.bak
+
+cp keepalived/check_apiserver.sh /etc/keepalived/
+
+sed \
+-e "s/K8SHA_KA_STATE/$K8SHA_KA_STATE/g" \
+-e "s/K8SHA_KA_INTF/$K8SHA_KA_INTF/g" \
+-e "s/K8SHA_IPLOCAL/$K8SHA_IPLOCAL/g" \
+-e "s/K8SHA_KA_PRIO/$K8SHA_KA_PRIO/g" \
+-e "s/K8SHA_IPVIRTUAL/$K8SHA_IPVIRTUAL/g" \
+-e "s/K8SHA_KA_AUTH/$K8SHA_KA_AUTH/g" \
+keepalived/keepalived.conf.tpl > /etc/keepalived/keepalived.conf
+
+echo 'set keepalived config file success: /etc/keepalived/keepalived.conf'
+
+# set nginx load balancer config file
+sed \
+-e "s/K8SHA_IP1/$K8SHA_IP1/g" \
+-e "s/K8SHA_IP2/$K8SHA_IP2/g" \
+-e "s/K8SHA_IP3/$K8SHA_IP3/g" \
+nginx-lb/nginx-lb.conf.tpl > nginx-lb/nginx-lb.conf
+
+echo 'set nginx load balancer config file success: nginx-lb/nginx-lb.conf'
+
+# set kubeadm init config file
+sed \
+-e "s/K8SHA_HOSTNAME1/$K8SHA_HOSTNAME1/g" \
+-e "s/K8SHA_HOSTNAME2/$K8SHA_HOSTNAME2/g" \
+-e "s/K8SHA_HOSTNAME3/$K8SHA_HOSTNAME3/g" \
+-e "s/K8SHA_IP1/$K8SHA_IP1/g" \
+-e "s/K8SHA_IP2/$K8SHA_IP2/g" \
+-e "s/K8SHA_IP3/$K8SHA_IP3/g" \
+-e "s/K8SHA_IPVIRTUAL/$K8SHA_IPVIRTUAL/g" \
+-e "s/K8SHA_TOKEN/$K8SHA_TOKEN/g" \
+-e "s/K8SHA_CIDR/$K8SHA_CIDR/g" \
+-e "s/K8SHA_SVC_CIDR/$K8SHA_SVC_CIDR/g" \
+kubeadm-init.yaml.tpl > kubeadm-init.yaml
+
+echo 'set kubeadm init config file success: kubeadm-init.yaml'
+
+# set canal deployment config file
+
+sed \
+-e "s/K8SHA_CIDR/$K8SHA_CIDR/g" \
+-e "s/K8SHA_CALICO_REACHABLE_IP/$K8SHA_CALICO_REACHABLE_IP/g" \
+kube-canal/canal.yaml.tpl > kube-canal/canal.yaml
+
+echo 'set canal deployment config file success: kube-canal/canal.yaml'
+
 ```
 
 * 在所有master节点上运行配置脚本，创建对应的配置文件，配置文件包括:
@@ -508,7 +609,7 @@ export K8SHA_CALICO_REACHABLE_IP=192.168.20.1
 
 > canal配置文件
 
-```
+```shell
 $ ./create-config.sh
 set etcd cluster docker-compose.yaml file success: etcd/docker-compose.yaml
 set keepalived config file success: /etc/keepalived/keepalived.conf
