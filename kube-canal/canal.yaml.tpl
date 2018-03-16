@@ -199,7 +199,7 @@ spec:
         # for allocating subnets.
         - name: kube-flannel
           image: registry.cn-beijing.aliyuncs.com/k8s_len/flannel:v0.9.1-amd64
-          command: [ "/opt/bin/flanneld", "--ip-masq", "--kube-subnet-mgr" ]
+          command: [ "/opt/bin/flanneld", "--ip-masq", "--kube-subnet-mgr","–iface=ens34" ]
           securityContext:
             privileged: true
           env:

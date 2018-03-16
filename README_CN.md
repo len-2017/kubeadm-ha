@@ -1,5 +1,7 @@
 ## kubeadm-highavailiability - 基于kubeadm的kubernetes高可用集群部署，支持v1.9.x和v1.7.x版本以及v1.6.x版本
 
+
+
 ![k8s logo](images/v1.6-v1.7/Kubernetes.png)
 
 - [中文文档(for v1.9.x版本)](README_CN.md)
@@ -204,12 +206,21 @@ docker pull nginx:latest
 
 主机名称设置
 
-```
+```shell
 hostnamectl --static set-hostname master01
 hostnamectl --static set-hostname master02
 hostnamectl --static set-hostname master03
 hostnamectl --static set-hostname node01
 hostnamectl --static set-hostname node02
+
+cat >> /etc/hosts <<EOF
+192.168.66.100 master01 etcd-host1
+192.168.66.101 master02 etcd-host2
+192.168.66.102 master03 etcd-host3
+192.168.66.104 node01
+192.168.66.105 node02
+192.168.66.106 node03
+EOF
 ```
 
 * 在所有kubernetes节点上增加kubernetes仓库 
@@ -280,7 +291,7 @@ reboot
 
 #### firewalld和iptables相关端口设置
 
-- 相关端口（master）
+#####相关端口（master）
 
 协议 | 方向 | 端口 | 说明
 :--- | :--- | :--- | :---
@@ -294,7 +305,9 @@ TCP | Inbound | 10252     | kube-controller-manager
 TCP | Inbound | 10255     | Read-only Kubelet API
 TCP | Inbound | 30000-32767 | NodePort Services
 
-- 在所有master节点上开放相关firewalld端口（因为以上服务基于docker部署，如果docker版本为17.x，可以不进行以下设置，因为docker会自动修改iptables添加相关端口）
+#####在所有master节点上开放相关firewalld端口
+
+在所有master节点上开放相关firewalld端口（因为以上服务基于docker部署，如果docker版本为17.x，可以不进行以下设置，因为docker会自动修改iptables添加相关端口）
 
 ```shell
 systemctl status firewalld
@@ -333,7 +346,7 @@ public (active)
 
 
 
-- 相关端口（worker）
+#####相关端口（worker）
 
 协议 | 方向 | 端口 | 说明
 :--- | :--- | :--- | :---
@@ -341,7 +354,9 @@ TCP | Inbound | 10250       | Kubelet API
 TCP | Inbound | 10255       | Read-only Kubelet API
 TCP | Inbound | 30000-32767 | NodePort Services
 
-- 在所有worker节点上开放相关firewalld端口（因为以上服务基于docker部署，如果docker版本为17.x，可以不进行以下设置，因为docker会自动修改iptables添加相关端口）
+#####所有worker节点上开放相关firewalld端口
+
+在所有worker节点上开放相关firewalld端口（因为以上服务基于docker部署，如果docker版本为17.x，可以不进行以下设置，因为docker会自动修改iptables添加相关端口）
 
 ```
 systemctl status firewalld
@@ -373,7 +388,7 @@ public (active)
 
 
 
-* 在所有kubernetes节点上允许kube-proxy的forward
+#####在所有kubernetes节点上允许kube-proxy的forward
 
 ```shell
 firewall-cmd --permanent --direct --add-rule ipv4 filter INPUT 1 -i docker0 -j ACCEPT -m comment --comment "kube-proxy redirects"
@@ -410,7 +425,9 @@ $ getenforce
 Permissive
 ```
 
-* 在所有kubernetes节点上安装并启动kubernetes 
+#####安装docker,docker-compose,k8s,
+
+在所有kubernetes节点上安装并启动kubernetes 
 
 ```shell
  yum -y install docker-ce-17.12.1.ce-1.el7.centos
@@ -423,6 +440,11 @@ systemctl enable docker && systemctl start docker && systemctl status docker
 cd kubeadm-rpm && rpm -ivh *.rpm
 systemctl enable kubelet && systemctl start kubelet
 
+```
+
+#####配置kubectl
+
+```properties
 # 配置kubectl
 #kubelet 修改 配置以使用本地自定义pause镜像
 export KUBE_REPO_PREFIX=registry.cn-beijing.aliyuncs.com/k8s_len
@@ -434,7 +456,9 @@ EOF
 systemctl daemon-reload && systemctl enable kubelet && systemctl restart kubelet && systemctl status kubelet
 ```
 
-* 在所有kubernetes节点上设置kubelet使用cgroupfs，与dockerd保持一致，否则kubelet会启动报错
+#####在所有kubernetes节点上设置kubelet使用cgroupfs
+
+在所有kubernetes节点上设置kubelet使用cgroupfs，与dockerd保持一致，否则kubelet会启动报错
 
 ```shell
 # 默认kubelet使用的cgroup-driver=systemd，改为cgroup-driver=cgroupfs
@@ -446,11 +470,11 @@ sed  -i 's/--cgroup-driver=systemd/--cgroup-driver=cgroupfs/' /etc/systemd/syste
 $ systemctl daemon-reload && systemctl restart kubelet
 ```
 
-* 在所有master节点上安装并启动keepalived
+#####在所有master节点上安装并启动keepalived
 
 ```shell
 yum install -y keepalived
-systemctl enable keepalived && systemctl restart keepalived
+systemctl enable keepalived && systemctl restart keepalived && systemctl status keepalived
 ```
 
 ---
@@ -601,18 +625,14 @@ echo 'set canal deployment config file success: kube-canal/canal.yaml'
 
 * 在所有master节点上运行配置脚本，创建对应的配置文件，配置文件包括:
 
-> etcd集群docker-compose.yaml文件
-
-> keepalived配置文件
-
-> nginx负载均衡集群docker-compose.yaml文件
-
-> kubeadm init 配置文件
-
-> canal配置文件
+- etcd集群docker-compose.yaml文件
+- keepalived配置文件
+- nginx负载均衡集群docker-compose.yaml文件
+- kubeadm init 配置文件
+- canal配置文件
 
 ```shell
-$ ./create-config.sh
+./create-config.sh
 set etcd cluster docker-compose.yaml file success: etcd/docker-compose.yaml
 set keepalived config file success: /etc/keepalived/keepalived.conf
 set nginx load balancer config file success: nginx-lb/nginx-lb.conf
@@ -642,14 +662,14 @@ docker-compose --file etcd/docker-compose.yaml up -d
 
 # 验证etcd集群状态是否正常
 
-$ docker exec -ti etcd etcdctl cluster-health
+docker exec -ti etcd etcdctl cluster-health
 [root@master01 kubeadm-ha]# docker exec -ti etcd etcdctl cluster-health
 member 472a2e811e55b95c is healthy: got healthy result from http://192.168.66.102:2379
 member a3cef8b35b895bf6 is healthy: got healthy result from http://192.168.66.100:2379
 member f29752f4343f3b79 is healthy: got healthy result from http://192.168.66.101:2379
 cluster is healthy
 
-[root@master01 kubeadm-ha]# docker exec -ti etcd etcdctl member list
+docker exec -ti etcd etcdctl member list
 472a2e811e55b95c: name=etcd3 peerURLs=http://192.168.66.102:2380 clientURLs=http://192.168.66.102:2379,http://192.168.66.102:4001 isLeader=true
 a3cef8b35b895bf6: name=etcd1 peerURLs=http://192.168.66.100:2380 clientURLs=http://192.168.66.100:2379,http://192.168.66.100:4001 isLeader=false
 f29752f4343f3b79: name=etcd2 peerURLs=http://192.168.66.101:2380 clientURLs=http://192.168.66.101:2379,http://192.168.66.101:4001 isLeader=false
@@ -678,39 +698,58 @@ ip link del docker0
 ip link del flannel.1
 ip link del cni0
 
-systemctl restart docker && systemctl restart kubelet
+systemctl restart docker && systemctl status docker
+systemctl restart kubelet && systemctl status kubelet
 ip a | grep -E 'docker|flannel|cni'
 ```
 
 * 在master01上进行初始化，注意，务必把输出的kubeadm join --token XXX --discovery-token-ca-cert-hash YYY 信息记录下来，后续操作需要用到
 
-```
-$ kubeadm init --config=kubeadm-init.yaml
+```properties
+kubeadm init --config=kubeadm-init.yaml
 ...
-  kubeadm join --token 7f276c.0741d82a5337f526 192.168.20.27:6443 --discovery-token-ca-cert-hash sha256:a4a1eaf725a0fc67c3028b3063b92e6af7f2eb0f4ae028f12b3415a6fd2d2a5e
+To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+You can now join any number of machines by running the following on each node
+as root:
+
+  kubeadm join --token 7f276c.0741d82a5337f526 192.168.66.100:6443 --discovery-token-ca-cert-hash sha256:731e73e7a91afaac61b7f183cba840680b204ede71f30cce56c63bb12a112086
 ```
 
 * 在所有master节点上设置kubectl客户端连接
 
-```
-$ vi ~/.bashrc
+```shell
+cat << EOF >> ~/.bashrc
 export KUBECONFIG=/etc/kubernetes/admin.conf
+EOF
+source ~/.bashrc
 
-$ source ~/.bashrc
+或者执行:
+  #mkdir -p $HOME/.kube
+  #sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  #sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
 
 #### 安装基础组件
 
-* 在devops-master01上安装flannel网络组件
+#####在master01上安装flannel网络组件
 
-```
+```shell
 # 没有网络组件的情况下，节点状态是不正常的
-$ kubectl get node
+kubectl get node
 NAME              STATUS    ROLES     AGE       VERSION
 devops-master01   NotReady  master    14s       v1.9.1
 
 # 安装canal网络组件
-$ kubectl apply -f kube-canal/
+kubectl apply -f kube-canal/
 configmap "canal-config" created
 daemonset "canal" created
 customresourcedefinition "felixconfigurations.crd.projectcalico.org" created
@@ -726,7 +765,7 @@ clusterrolebinding "canal-flannel" created
 clusterrolebinding "canal-calico" created
 
 # 等待所有pods正常
-$ kubectl get pods --all-namespaces -o wide
+kubectl get pods --all-namespaces -o wide
 NAMESPACE     NAME                                      READY     STATUS    RESTARTS   AGE       IP              NODE
 kube-system   canal-hpn82                               3/3       Running   0          1m        192.168.20.27   devops-master01
 kube-system   kube-apiserver-devops-master01            1/1       Running   0          1m        192.168.20.27   devops-master01
@@ -736,13 +775,13 @@ kube-system   kube-proxy-mr6l8                          1/1       Running   0   
 kube-system   kube-scheduler-devops-master01            1/1       Running   0          57s       192.168.20.27   devops-master01
 ```
 
-* 在devops-master01上安装dashboard
+#####在devops-master01上安装dashboard
 
-```
+```shell
 # 设置master节点为schedulable
-$ kubectl taint nodes --all node-role.kubernetes.io/master-
+kubectl taint nodes --all node-role.kubernetes.io/master-
 
-$ kubectl apply -f kube-dashboard/
+kubectl apply -f kube-dashboard/
 serviceaccount "admin-user" created
 clusterrolebinding "admin-user" created
 secret "kubernetes-dashboard-certs" created
@@ -755,7 +794,7 @@ service "kubernetes-dashboard" created
 
 * 通过浏览器访问dashboard地址
 
-> https://devops-master01:30000/#!/login
+> https://192.168.66.100:30000/#!/login
 
 * dashboard登录页面效果如下图
 
@@ -763,16 +802,17 @@ service "kubernetes-dashboard" created
 
 * 获取token，把token粘贴到login页面的token中，即可进入dashboard
 
-```
-$ kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
+```shell
+kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
 ```
 
 ![dashboard](images/dashboard.png)
 
-* 在devops-master01上安装heapster
+#####在devops-master01上安装heapster
 
-```
-$ kubectl apply -f kube-heapster/influxdb/
+```shell
+#
+kubectl apply -f kube-heapster/influxdb/
 service "monitoring-grafana" created
 serviceaccount "heapster" created
 deployment "heapster" created
@@ -780,10 +820,12 @@ service "heapster" created
 deployment "monitoring-influxdb" created
 service "monitoring-influxdb" created
 
-$ kubectl apply -f kube-heapster/rbac/
+#
+kubectl apply -f kube-heapster/rbac/
 clusterrolebinding "heapster" created
 
-$ kubectl get pods --all-namespaces 
+#
+kubectl get pods --all-namespaces 
 NAMESPACE     NAME                                      READY     STATUS    RESTARTS   AGE
 kube-system   canal-hpn82                               3/3       Running   0          6m
 kube-system   heapster-65c5499476-gg2tk                 1/1       Running   0          2m
@@ -805,7 +847,7 @@ devops-master01   242m         0%        1690Mi          0%
 
 * 访问dashboard地址，等10分钟，就会显示性能数据
 
-> https://devops-master01:30000/#!/login
+> https://192.168.66.100:30000/#!/login
 
 ![heapster-dashboard](images/heapster-dashboard.png)
 
@@ -821,12 +863,14 @@ devops-master01   242m         0%        1690Mi          0%
 
 #### 复制配置
 
-* 在devops-master01上复制目录/etc/kubernetes/pki到devops-master02、devops-master03，从v1.9.x开始，kubeadm会检测pki目录是否有证书，如果已经存在证书则跳过证书生成的步骤
+* 在master01上复制目录/etc/kubernetes/pki到devops-master02、devops-master03，从v1.9.x开始，kubeadm会检测pki目录是否有证书，如果已经存在证书则跳过证书生成的步骤
 
-```
-scp -r /etc/kubernetes/pki devops-master02:/etc/kubernetes/
+```shell
+#
+scp -r /etc/kubernetes/pki master02:/etc/kubernetes/
+#
+scp -r /etc/kubernetes/pki master03:/etc/kubernetes/
 
-scp -r /etc/kubernetes/pki devops-master03:/etc/kubernetes/
 ```
 
 ---
@@ -834,27 +878,33 @@ scp -r /etc/kubernetes/pki devops-master03:/etc/kubernetes/
 
 #### 其余master节点初始化
 
-* 在devops-master02进行初始化，等待所有pods正常启动后再进行下一个master初始化，特别要保证kube-apiserver-{current-node-name}处于running状态
+#####master02 初始化
 
-```
+在master02进行初始化，等待所有pods正常启动后再进行下一个master初始化，**特别要保证kube-apiserver-{current-node-name}处于running状态**
+
+```shell
 # 输出的token和discovery-token-ca-cert-hash应该与devops-master01上的完全一致
 $ kubeadm init --config=kubeadm-init.yaml
 ...
-  kubeadm join --token 7f276c.0741d82a5337f526 192.168.20.28:6443 --discovery-token-ca-cert-hash sha256:a4a1eaf725a0fc67c3028b3063b92e6af7f2eb0f4ae028f12b3415a6fd2d2a5e
+  kubeadm join --token 7f276c.0741d82a5337f526 192.168.66.101:6443 --discovery-token-ca-cert-hash sha256:731e73e7a91afaac61b7f183cba840680b204ede71f30cce56c63bb12a112086
 ```
 
-* 在devops-master03进行初始化，等待所有pods正常启动后再进行下一个master初始化，特别要保证kube-apiserver-{current-node-name}处于running状态
+#####master03初始化
 
-```
+在devops-master03进行初始化，等待所有pods正常启动后再进行下一个master初始化，特别要保证kube-apiserver-{current-node-name}处于running状态
+
+```shell
 # 输出的token和discovery-token-ca-cert-hash应该与devops-master01上的完全一致
 $ kubeadm init --config=kubeadm-init.yaml
 ...
-  kubeadm join --token 7f276c.0741d82a5337f526 192.168.20.29:6443 --discovery-token-ca-cert-hash sha256:a4a1eaf725a0fc67c3028b3063b92e6af7f2eb0f4ae028f12b3415a6fd2d2a5e
+  kubeadm join --token 7f276c.0741d82a5337f526 192.168.66.102:6443 --discovery-token-ca-cert-hash sha256:731e73e7a91afaac61b7f183cba840680b204ede71f30cce56c63bb12a112086
 ```
 
-* 在devops-master01上检查nodes加入情况
+#####master01上检查
 
-```
+在dmaster01上检查nodes加入情况
+
+```shell
 $ kubectl get nodes
 NAME              STATUS    ROLES     AGE       VERSION
 devops-master01   Ready     master    19m       v1.9.3
@@ -862,9 +912,9 @@ devops-master02   Ready     master    4m        v1.9.3
 devops-master03   Ready     master    4m        v1.9.3
 ```
 
-* 在devops-master01上检查高可用状态
+#####在devops-master01上检查高可用状态
 
-```
+```shell
 $ kubectl get pods --all-namespaces -o wide 
 NAMESPACE     NAME                                      READY     STATUS    RESTARTS   AGE       IP              NODE
 kube-system   canal-cw8tw                               3/3       Running   4          3m        192.168.20.29   devops-master03
@@ -889,18 +939,18 @@ kube-system   monitoring-grafana-6774f65b56-mwdjv       1/1       Running   1   
 kube-system   monitoring-influxdb-59d57d4d58-xmrxk      1/1       Running   1          13m       10.244.0.6      devops-master01
 ```
 
-* 设置所有master的scheduable
+#####设置所有master的scheduable
 
-```
-$ kubectl taint nodes --all node-role.kubernetes.io/master-
+```shell
+kubectl taint nodes --all node-role.kubernetes.io/master-
 node "devops-master02" untainted
 node "devops-master03" untainted
 ```
 
-* 对基础组件进行多节点scale
+#####对基础组件进行多节点scale
 
-```
-$ kubectl get deploy -n kube-system
+```shell
+kubectl get deploy -n kube-system
 NAME                   DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 heapster               1         1         1            1           3d
 kube-dns               2         2         2            2           4d
@@ -909,8 +959,8 @@ monitoring-grafana     1         1         1            1           3d
 monitoring-influxdb    1         1         1            1           3d
 
 # dns支持多节点
-$ kubectl scale --replicas=2 -n kube-system deployment/kube-dns
-$ kubectl get pods --all-namespaces -o wide| grep kube-dns
+kubectl scale --replicas=2 -n kube-system deployment/kube-dns
+kubectl get pods --all-namespaces -o wide| grep kube-dns
 
 ```
 
@@ -920,12 +970,11 @@ $ kubectl get pods --all-namespaces -o wide| grep kube-dns
 
 #### keepalived安装配置
 
-* 在master上安装keepalived
+#####在master上重启keepalived
 
-```
-$ systemctl restart keepalived
-
-$ ping 192.168.20.10
+```shell
+systemctl restart keepalived && systemctl status keepalived
+$ ping 192.168.66.10
 ```
 
 ---
@@ -936,14 +985,14 @@ $ ping 192.168.20.10
 
 * 在master上安装并启动nginx作为负载均衡
 
-```
-$ docker-compose -f nginx-lb/docker-compose.yaml up -d
+```shell
+docker-compose -f nginx-lb/docker-compose.yaml up -d
 ```
 
 * 在master上验证负载均衡和keepalived是否成功
 
-```
-curl -k https://192.168.20.10:16443
+```shell
+curl -k https://192.168.66.10:16443
 {
   "kind": "Status",
   "apiVersion": "v1",
@@ -966,18 +1015,22 @@ curl -k https://192.168.20.10:16443
 
 #### kube-proxy配置
 
-- 在devops-master01上设置proxy高可用，设置server指向高可用虚拟IP以及负载均衡的16443端口
-```
+- master01上设置proxy高可用，设置server指向高可用虚拟IP以及负载均衡的16443端口
+```shell
 $ kubectl edit -n kube-system configmap/kube-proxy
-        server: https://192.168.20.10:16443
+###修改 server: https://192.168.66.10:16443
 ```
 
 - 在master上重启proxy
 
-```
-$ kubectl get pods --all-namespaces -o wide | grep proxy
+```shell
+kubectl get pods --all-namespaces -o wide | grep proxy
+kubectl delete pod -n kube-system kube-proxy-XXX
 
-$ kubectl delete pod -n kube-system kube-proxy-XXX
+[root@master01 kubeadm-ha]# kubectl get pods --all-namespaces -o wide | grep proxy
+kube-system   kube-proxy-n5hjz                        1/1       Running            0          4m        192.168.66.101   master02
+kube-system   kube-proxy-pf2j9                        1/1       Running            0          4m        192.168.66.100   master01
+kube-system   kube-proxy-r2xhb                        1/1       Running            0          14s       192.168.66.102   master03
 ```
 
 ---
@@ -990,30 +1043,30 @@ $ kubectl delete pod -n kube-system kube-proxy-XXX
 
 - 在所有worker节点上进行加入kubernetes集群操作，这里统一使用devops-master01的apiserver地址来加入集群 
 
-```
-$ kubeadm join --token 7f276c.0741d82a5337f526 192.168.20.27:6443 --discovery-token-ca-cert-hash sha256:a4a1eaf725a0fc67c3028b3063b92e6af7f2eb0f4ae028f12b3415a6fd2d2a5e
+```shell
+kubeadm join --token 7f276c.0741d82a5337f526 192.168.66.100:6443 --discovery-token-ca-cert-hash sha256:731e73e7a91afaac61b7f183cba840680b204ede71f30cce56c63bb12a112086
 ```
 
 - 在所有worker节点上修改kubernetes集群设置，更改server为高可用虚拟IP以及负载均衡的16443端口
 
-```
-$ sed -i "s/192.168.20.27:6443/192.168.20.10:16443/g" /etc/kubernetes/bootstrap-kubelet.conf
-$ sed -i "s/192.168.20.28:6443/192.168.20.10:16443/g" /etc/kubernetes/bootstrap-kubelet.conf
-$ sed -i "s/192.168.20.29:6443/192.168.20.10:16443/g" /etc/kubernetes/bootstrap-kubelet.conf
+```shell
+sed -i "s/192.168.66.100:6443/192.168.66.10:16443/g" /etc/kubernetes/bootstrap-kubelet.conf
+sed -i "s/192.168.66.101:6443/192.168.66.10:16443/g" /etc/kubernetes/bootstrap-kubelet.conf
+sed -i "s/192.168.66.102:6443/192.168.66.10:16443/g" /etc/kubernetes/bootstrap-kubelet.conf
 
-$ sed -i "s/192.168.20.27:6443/192.168.20.10:16443/g" /etc/kubernetes/kubelet.conf
-$ sed -i "s/192.168.20.28:6443/192.168.20.10:16443/g" /etc/kubernetes/kubelet.conf
-$ sed -i "s/192.168.20.29:6443/192.168.20.10:16443/g" /etc/kubernetes/kubelet.conf
+sed -i "s/192.168.66.100:6443/192.168.66.10:16443/g" /etc/kubernetes/kubelet.conf
+sed -i "s/192.168.66.101:6443/192.168.66.10:16443/g" /etc/kubernetes/kubelet.conf
+sed -i "s/192.168.66.102:6443/192.168.66.10:16443/g" /etc/kubernetes/kubelet.conf
 
-$ grep 192.168.20 /etc/kubernetes/*.conf 
-/etc/kubernetes/bootstrap-kubelet.conf:    server: https://192.168.20.10:16443
-/etc/kubernetes/kubelet.conf:    server: https://192.168.20.10:16443
+grep 192.168.66.10 /etc/kubernetes/*.conf 
+/etc/kubernetes/bootstrap-kubelet.conf:    server: https://192.168.66.10:16443
+/etc/kubernetes/kubelet.conf:    server: https://192.168.66.10:16443
 
 $ systemctl restart docker kubelet
 ```
 
 
-```
+```shell
 kubectl get nodes
 NAME              STATUS    ROLES     AGE       VERSION
 devops-master01   Ready     master    46m       v1.9.3
