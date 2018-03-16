@@ -138,7 +138,8 @@ spec:
             - name: IP
               value: "autodetect"
             - name: IP_AUTODETECTION_METHOD
-              value: "can-reach=K8SHA_CALICO_REACHABLE_IP"
+            # value: "can-reach=K8SHA_CALICO_REACHABLE_IP"
+              value: "interface=K8SHA_KA_INTF"
             - name: NODENAME
               valueFrom:
                 fieldRef:

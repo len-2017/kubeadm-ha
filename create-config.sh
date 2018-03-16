@@ -117,6 +117,7 @@ echo 'set kubeadm init config file success: kubeadm-init.yaml'
 
 sed \
 -e "s/K8SHA_CIDR/$K8SHA_CIDR/g" \
+-e "s/K8SHA_KA_INTF/$K8SHA_KA_INTF/g" \
 -e "s/K8SHA_CALICO_REACHABLE_IP/$K8SHA_CALICO_REACHABLE_IP/g" \
 kube-canal/canal.yaml.tpl > kube-canal/canal.yaml
 

@@ -467,7 +467,7 @@ systemctl daemon-reload && systemctl enable kubelet && systemctl restart kubelet
 #Environment="KUBELET_CGROUP_ARGS=--cgroup-driver=cgroupfs"
 sed  -i 's/--cgroup-driver=systemd/--cgroup-driver=cgroupfs/' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
 # 重设kubelet服务，并重启kubelet服务
-$ systemctl daemon-reload && systemctl restart kubelet
+$ systemctl daemon-reload && systemctl restart kubelet && systemctl status kubelet
 ```
 
 #####在所有master节点上安装并启动keepalived
