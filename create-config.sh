@@ -13,7 +13,7 @@ export K8SHA_KA_STATE=MASTER
 export K8SHA_KA_PRIO=102
 
 # local machine keepalived network interface name config, for example: eth0
-export K8SHA_KA_INTF=nm-bond
+export K8SHA_KA_INTF=ens34
 
 
 #######################################
