@@ -628,7 +628,7 @@ set canal deployment config file success: kube-canal/canal.yaml
 
 * 在所有master节点上重置并启动etcd集群（非TLS模式）
 
-```
+```shell
 # 重置kubernetes集群
 $ kubeadm reset
 
@@ -636,22 +636,23 @@ $ kubeadm reset
 $ rm -rf /var/lib/etcd-cluster
 
 # 重置并启动etcd集群
-$ docker-compose --file etcd/docker-compose.yaml stop
-$ docker-compose --file etcd/docker-compose.yaml rm -f
-$ docker-compose --file etcd/docker-compose.yaml up -d
+docker-compose --file etcd/docker-compose.yaml stop
+docker-compose --file etcd/docker-compose.yaml rm -f
+docker-compose --file etcd/docker-compose.yaml up -d
 
 # 验证etcd集群状态是否正常
 
 $ docker exec -ti etcd etcdctl cluster-health
-member 531504c79088f553 is healthy: got healthy result from http://192.168.20.29:2379
-member 56c53113d5e1cfa3 is healthy: got healthy result from http://192.168.20.27:2379
-member 7026e604579e4d64 is healthy: got healthy result from http://192.168.20.28:2379
+[root@master01 kubeadm-ha]# docker exec -ti etcd etcdctl cluster-health
+member 472a2e811e55b95c is healthy: got healthy result from http://192.168.66.102:2379
+member a3cef8b35b895bf6 is healthy: got healthy result from http://192.168.66.100:2379
+member f29752f4343f3b79 is healthy: got healthy result from http://192.168.66.101:2379
 cluster is healthy
 
-$ docker exec -ti etcd etcdctl member list
-531504c79088f553: name=etcd3 peerURLs=http://192.168.20.29:2380 clientURLs=http://192.168.20.29:2379,http://192.168.20.29:4001 isLeader=false
-56c53113d5e1cfa3: name=etcd1 peerURLs=http://192.168.20.27:2380 clientURLs=http://192.168.20.27:2379,http://192.168.20.27:4001 isLeader=false
-7026e604579e4d64: name=etcd2 peerURLs=http://192.168.20.28:2380 clientURLs=http://192.168.20.28:2379,http://192.168.20.28:4001 isLeader=true
+[root@master01 kubeadm-ha]# docker exec -ti etcd etcdctl member list
+472a2e811e55b95c: name=etcd3 peerURLs=http://192.168.66.102:2380 clientURLs=http://192.168.66.102:2379,http://192.168.66.102:4001 isLeader=true
+a3cef8b35b895bf6: name=etcd1 peerURLs=http://192.168.66.100:2380 clientURLs=http://192.168.66.100:2379,http://192.168.66.100:4001 isLeader=false
+f29752f4343f3b79: name=etcd2 peerURLs=http://192.168.66.101:2380 clientURLs=http://192.168.66.101:2379,http://192.168.66.101:4001 isLeader=false
 ```
 
 ---
@@ -664,24 +665,24 @@ $ docker exec -ti etcd etcdctl member list
 
 * 在所有master节点上重置网络
 
+```shell
+systemctl stop kubelet
+systemctl stop docker
+rm -rf /var/lib/cni/
+rm -rf /var/lib/kubelet/*
+rm -rf /etc/cni/
+
+删除遗留的网络接口
+ip a | grep -E 'docker|flannel|cni'
+ip link del docker0
+ip link del flannel.1
+ip link del cni0
+
+systemctl restart docker && systemctl restart kubelet
+ip a | grep -E 'docker|flannel|cni'
 ```
-$ systemctl stop kubelet
-$ systemctl stop docker
-$ rm -rf /var/lib/cni/
-$ rm -rf /var/lib/kubelet/*
-$ rm -rf /etc/cni/
 
-# 删除遗留的网络接口
-$ ip a | grep -E 'docker|flannel|cni'
-$ ip link del docker0
-$ ip link del flannel.1
-$ ip link del cni0
-
-$ systemctl restart docker && systemctl restart kubelet
-$ ip a | grep -E 'docker|flannel|cni'
-```
-
-* 在devops-master01上进行初始化，注意，务必把输出的kubeadm join --token XXX --discovery-token-ca-cert-hash YYY 信息记录下来，后续操作需要用到
+* 在master01上进行初始化，注意，务必把输出的kubeadm join --token XXX --discovery-token-ca-cert-hash YYY 信息记录下来，后续操作需要用到
 
 ```
 $ kubeadm init --config=kubeadm-init.yaml

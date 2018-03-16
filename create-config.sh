@@ -98,6 +98,7 @@ echo 'set nginx load balancer config file success: nginx-lb/nginx-lb.conf'
 
 # set kubeadm init config file
 sed \
+-e "s/K8SHA_IPLOCAL/$K8SHA_IPLOCAL/g" \
 -e "s/K8SHA_HOSTNAME1/$K8SHA_HOSTNAME1/g" \
 -e "s/K8SHA_HOSTNAME2/$K8SHA_HOSTNAME2/g" \
 -e "s/K8SHA_HOSTNAME3/$K8SHA_HOSTNAME3/g" \
