@@ -20,9 +20,6 @@ export K8SHA_KA_INTF=ens34
 # all masters settings below must be same
 #######################################
 
-#base image
-export KUBE_REPO_PREFIX=registry.cn-beijing.aliyuncs.com/k8s_len
-
 # master keepalived virtual ip address
 export K8SHA_IPVIRTUAL=192.168.66.10
 
@@ -111,7 +108,6 @@ sed \
 -e "s/K8SHA_TOKEN/$K8SHA_TOKEN/g" \
 -e "s/K8SHA_CIDR/$K8SHA_CIDR/g" \
 -e "s/K8SHA_SVC_CIDR/$K8SHA_SVC_CIDR/g" \
--e "s/KUBE_REPO_PREFIX/$KUBE_REPO_PREFIX/g" \
 kubeadm-init.yaml.tpl > kubeadm-init.yaml
 
 echo 'set kubeadm init config file success: kubeadm-init.yaml'

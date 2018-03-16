@@ -18,5 +18,5 @@ etcd:
   - http://K8SHA_IP2:2379
   - http://K8SHA_IP3:2379
 token: K8SHA_TOKEN
-imageRepository: KUBE_REPO_PREFIX
+imageRepository: registry.cn-beijing.aliyuncs.com/k8s_len
 tokenTTL: "0"

@@ -464,8 +464,10 @@ systemctl enable keepalived && systemctl restart keepalived
 * 在所有master节点上获取代码，并进入代码目录
 
 ```shell
-git clone https://github.com/cookeem/kubeadm-ha
+#git clone https://github.com/cookeem/kubeadm-ha
+git clone https://github.com/len-2017/kubeadm-ha.git
 cd kubeadm-ha
+git checkout len_v1.9.3 
 ```
 
 * 在所有master节点上设置初始化脚本配置，每一项配置参见脚本中的配置说明，请务必正确配置。该脚本用于生成相关重要的配置文件
